@@ -12,18 +12,29 @@
 #include <vector>
 #include <string>
 
+extern "C"
+{
+#include "host/ble_gap.h"
+}
 
-class JkBmsBle {
-  public:
-  /* Default constructor */
+class JkBmsBle
+{
+public:
   JkBmsBle();
-
-  /* Default destructor */
   ~JkBmsBle();
 
-  /* Initialize BLE */
-  void init_ble();
-
-  /* Write register */
+  void ble_initialize();
+  static void ble_start_scanning();
   static bool write_register(uint8_t address, uint32_t value, uint8_t length);
+  static void assemble(const uint8_t *data, uint16_t length);
+  static void decode_device_info_(const std::vector<uint8_t> &data);
+
+private:
+  static std::vector<uint8_t> frame_buffer_;
 };
+
+// BLE event handler (used in ble_gap_connect and ble_gap_disc)
+extern "C" int ble_gap_event_handler(struct ble_gap_event *event, void *arg);
+
+// Utility
+uint8_t crc(const uint8_t data[], const uint16_t len);
