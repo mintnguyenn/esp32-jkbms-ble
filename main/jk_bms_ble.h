@@ -12,7 +12,6 @@
 #include <vector>
 #include <string>
 
-static const char *tag = "ESP32-BMS";
 
 class JkBmsBle {
   public:
@@ -24,4 +23,7 @@ class JkBmsBle {
 
   /* Initialize BLE */
   void init_ble();
+
+  /* Write register */
+  static bool write_register(uint8_t address, uint32_t value, uint8_t length);
 };
