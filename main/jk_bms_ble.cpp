@@ -121,22 +121,27 @@ int ble_gap_event_handler(struct ble_gap_event *event, void *arg)
                  event->disc.addr.val[5], event->disc.addr.val[4], event->disc.addr.val[3],
                  event->disc.addr.val[2], event->disc.addr.val[1], event->disc.addr.val[0]);
         ble_connect(&event->disc);
+
         break;
 
     case BLE_GAP_EVENT_CONNECT:
+    {
         if (event->connect.status != 0)
         {
-            ESP_LOGE(tag, "Connection failed; status=%d", event->connect.status);
+            ESP_LOGE(tag, "CONNECTION FAILED; status=%d", event->connect.status);
             return 0;
         }
-        ESP_LOGI(tag, "CONNECTION COMPLETE; conn_handle=%d", event->connect.conn_handle);
+        ESP_LOGI(tag, "CONNECTION COMPLETED; conn_handle=%d", event->connect.conn_handle);
 
-        // Delay before sending the first command
-        vTaskDelay(pdMS_TO_TICKS(500));
+        // Initiate MTU exchange
+        int rc = ble_gattc_exchange_mtu(event->connect.conn_handle, NULL, NULL);
+        if (rc != 0)
+        {
+            ESP_LOGW(tag, "MTU exchange start failed; rc=%d", rc);
+        }
 
-        // Request Device info
-        JkBmsBle::write_register(COMMAND_DEVICE_INFO, 0x00000000, 0x00);
         break;
+    }
 
     case BLE_GAP_EVENT_NOTIFY_RX:
     {
@@ -150,12 +155,27 @@ int ble_gap_event_handler(struct ble_gap_event *event, void *arg)
             break;
         ESP_LOGI(tag, "Notification received; conn_handle=%d, attr_handle=%d, len=%d",
                  event->notify_rx.conn_handle, event->notify_rx.attr_handle, len);
-        ESP_LOG_BUFFER_HEX(tag, data.data(), len);
+        // ESP_LOG_BUFFER_HEX(tag, data.data(), len);
 
         // Assemble the frame
         JkBmsBle::assemble(data.data(), len);
+
         break;
     }
+
+    case BLE_GAP_EVENT_MTU:
+        ESP_LOGI(tag, "mtu update event; conn_handle=%d cid=%d mtu=%d\n",
+                 event->mtu.conn_handle,
+                 event->mtu.channel_id,
+                 event->mtu.value);
+
+        // Request Device info
+        vTaskDelay(pdMS_TO_TICKS(500));
+        JkBmsBle::write_register(COMMAND_DEVICE_INFO, 0x00000000, 0x00);
+        vTaskDelay(pdMS_TO_TICKS(500));
+        JkBmsBle::write_register(COMMAND_CELL_INFO, 0x00000000, 0x00);
+
+        break;
 
     default:
         break;
@@ -187,9 +207,9 @@ bool JkBmsBle::write_register(uint8_t address, uint32_t value, uint8_t length)
         (uint8_t)(value >> 24),
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00};
-
     frame[19] = crc(frame, sizeof(frame) - 1);
-    int rc = ble_gattc_write_flat(0, 18, frame, sizeof(frame), NULL, NULL);
+
+    int rc = ble_gattc_write_no_rsp_flat(0, 0x12, frame, sizeof(frame));
     if (rc != 0)
     {
         ESP_LOGW(tag, "write_register failed; rc=%d", rc);
@@ -229,6 +249,9 @@ void JkBmsBle::ble_initialize()
 
 void JkBmsBle::assemble(const uint8_t *data, uint16_t length)
 {
+    if (data == nullptr || length == 0)
+        return;
+
     if (frame_buffer_.size() > MAX_RESPONSE_SIZE)
     {
         ESP_LOGW(tag, "Frame dropped because of invalid length");
@@ -267,12 +290,29 @@ void JkBmsBle::assemble(const uint8_t *data, uint16_t length)
             return;
         }
 
-        std::vector<uint8_t> full_data(frame_buffer_.begin(), frame_buffer_.end());
-        ESP_LOGI(tag, "Raw data frame (%d bytes) received", full_data.size());
-        ESP_LOG_BUFFER_HEX(tag, full_data.data(), full_data.size());
+        ESP_LOGI(tag, "Raw data frame (%d bytes) received", frame_buffer_.size());
+        ESP_LOG_BUFFER_HEX(tag, frame_buffer_.data(), frame_buffer_.size());
         ESP_LOGI(tag, "\n");
 
-        JkBmsBle::decode_device_info_(full_data);
+        switch (frame_buffer_[4])
+        {
+        case 0x01:
+            decode_device_settings_(frame_buffer_);
+            break;
+
+        case 0x02:
+            decode_cell_info_(frame_buffer_);
+            break;
+
+        case 0x03:
+            decode_device_info_(frame_buffer_);
+            break;
+
+        default:
+            ESP_LOGW(tag, "Unknown command in response: 0x%02X", frame_buffer_[4]);
+            break;
+        }
+
         frame_buffer_.clear();
     }
 }
@@ -301,9 +341,76 @@ void JkBmsBle::decode_device_info_(const std::vector<uint8_t> &data)
     ESP_LOGI(tag, "  Passcode:           %s", std::string(data.begin() + 97, data.begin() + 97 + 5).c_str());
     ESP_LOGI(tag, "  User data:          %s", std::string(data.begin() + 102, data.begin() + 102 + 16).c_str());
     ESP_LOGI(tag, "  Setup passcode:     %s", std::string(data.begin() + 118, data.begin() + 118 + 16).c_str());
-    // ESP_LOGI(TAG, "  UART1 Protocol: %d", data[184]);
-    // ESP_LOGI(TAG, "  CAN Protocol: %d", data[185]);
-    // ESP_LOGI(TAG, "  UART2 Protocol: %d", data[218]);
-    // ESP_LOGI(TAG, "  RCV Time: %.1f h", (float) data[266] * 0.1f);
-    // ESP_LOGI(TAG, "  RFV Time: %.1f h", (float) data[267] * 0.1f);
+    ESP_LOGI(tag, "  UART1 Protocol:     %d", data[184]);
+    ESP_LOGI(tag, "  CAN Protocol:       %d", data[185]);
+    ESP_LOGI(tag, "  UART2 Protocol:     %d", data[218]);
+    ESP_LOGI(tag, "  RCV Time:           %.1f h", (float)data[266] * 0.1f);
+    ESP_LOGI(tag, "  RFV Time:           %.1f h", (float)data[267] * 0.1f);
+}
+
+void JkBmsBle::decode_device_settings_(const std::vector<uint8_t> &data)
+{
+    auto jk_get_16bit = [&](size_t i) -> uint16_t
+    { return (uint16_t(data[i + 1]) << 8) | (uint16_t(data[i + 0]) << 0); };
+    auto jk_get_32bit = [&](size_t i) -> uint32_t
+    {
+        return (uint32_t(jk_get_16bit(i + 2)) << 16) | (uint32_t(jk_get_16bit(i + 0)) << 0);
+    };
+
+    ESP_LOGI(tag, "Device settings frame (%d bytes) received", data.size());
+    // ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front(), 160).c_str());
+    // ESP_LOGVV(TAG, "  %s", format_hex_pretty(&data.front() + 160, data.size() - 160).c_str());
+    ESP_LOGI(tag, "  Smart sleep voltage:                       %f", (float)jk_get_32bit(6) * 0.001f);
+    ESP_LOGI(tag, "  Cell UVP:                                  %f V", (float)jk_get_32bit(10) * 0.001f);
+    ESP_LOGI(tag, "  Cell UVPR:                                 %f V", (float)jk_get_32bit(14) * 0.001f);
+    ESP_LOGI(tag, "  Cell OVP:                                  %f V", (float)jk_get_32bit(18) * 0.001f);
+    ESP_LOGI(tag, "  Cell OVPR:                                 %f V", (float)jk_get_32bit(22) * 0.001f);
+    ESP_LOGI(tag, "  Balance trigger voltage:                   %f V", (float)jk_get_32bit(26) * 0.001f);
+    ESP_LOGI(tag, "  SOC 100%% voltage:                         %f V", (float)jk_get_32bit(30) * 0.001f);
+    ESP_LOGI(tag, "  SOC 0%% voltage:                           %f V", (float)jk_get_32bit(34) * 0.001f);
+    ESP_LOGI(tag, "  Voltage cell request charge voltage [RCV]: %f V", (float)jk_get_32bit(38) * 0.001f);
+    ESP_LOGI(tag, "  Voltage cell request float voltage [RFV]:  %f V", (float)jk_get_32bit(42) * 0.001f);
+    ESP_LOGI(tag, "  Power off voltage:                         %f V", (float)jk_get_32bit(46) * 0.001f);
+    ESP_LOGI(tag, "  Max. charge current:                       %f A", (float)jk_get_32bit(50) * 0.001f);
+    ESP_LOGI(tag, "  Charge OCP delay:                          %f s", (float)jk_get_32bit(54));
+    ESP_LOGI(tag, "  Charge OCP recovery time:                  %f s", (float)jk_get_32bit(58));
+    ESP_LOGI(tag, "  Max. discharge current:                    %f A", (float)jk_get_32bit(62) * 0.001f);
+    ESP_LOGI(tag, "  Discharge OCP delay:                       %f s", (float)jk_get_32bit(66));
+    ESP_LOGI(tag, "  Discharge OCP recovery time:               %f s", (float)jk_get_32bit(70));
+    ESP_LOGI(tag, "  Short circuit protection recovery time:    %f s", (float)jk_get_32bit(74));
+    ESP_LOGI(tag, "  Max. balance current:                      %f A", (float)jk_get_32bit(78) * 0.001f);
+    ESP_LOGI(tag, "  Charge OTP:                                %f °C", (float)jk_get_32bit(82) * 0.1f);
+    ESP_LOGI(tag, "  Charge OTP recovery:                       %f °C", (float)jk_get_32bit(86) * 0.1f);
+    ESP_LOGI(tag, "  Discharge OTP:                             %f °C", (float)jk_get_32bit(90) * 0.1f);
+    ESP_LOGI(tag, "  Discharge OTP recovery:                    %f °C", (float)jk_get_32bit(94) * 0.1f);
+    ESP_LOGI(tag, "  Charge UTP:                                %f °C", (float)((int32_t)jk_get_32bit(98)) * 0.1f);
+    ESP_LOGI(tag, "  Charge UTP recovery:                       %f °C", (float)((int32_t)jk_get_32bit(102)) * 0.1f);
+    ESP_LOGI(tag, "  Mosfet OTP:                                %f °C", (float)((int32_t)jk_get_32bit(106)) * 0.1f);
+    ESP_LOGI(tag, "  Mosfet OTP recovery:                       %f °C", (float)((int32_t)jk_get_32bit(110)) * 0.1f);
+    ESP_LOGI(tag, "  Cell count:                                %f", (float)jk_get_32bit(114));
+    ESP_LOGI(tag, "  Charge switch:     %s", (data[118] ? "ON" : "OFF"));
+    ESP_LOGI(tag, "  Discharge switch:  %s", (data[122] ? "ON" : "OFF"));
+    ESP_LOGI(tag, "  Balancer switch:   %s", (data[126] ? "ON" : "OFF"));
+    ESP_LOGI(tag, "  Nominal battery capacity:                  %f Ah", (float)jk_get_32bit(130) * 0.001f);
+    ESP_LOGI(tag, "  Short circuit protection delay:            %f us", (float)jk_get_32bit(134) * 1.0f);
+    ESP_LOGI(tag, "  Start balance voltage:                     %f V", (float)jk_get_32bit(138) * 0.001f);
+
+    for (uint8_t i = 0; i < 32; i++)
+    {
+        ESP_LOGI(tag, "  Con. wire resistance %d: %f Ohm", i + 1, (float)jk_get_32bit(i * 4 + 142) * 0.001f);
+    }
+    ESP_LOGI(tag, "  Device address:                            %d", data[270]);
+    ESP_LOGI(tag, "  Precharge time:                            %d s", data[274]);
+    ESP_LOGI(tag, "  Heating switch:     %s", check_bit_(data[282], 1) ? "ON" : "OFF");
+    ESP_LOGI(tag, "  GPS Heartbeat:      %s", check_bit_(data[282], 4) ? "ON" : "OFF");
+    ESP_LOGI(tag, "  Port switch:        %s", check_bit_(data[282], 8) ? "RS485" : "CAN");
+    ESP_LOGI(tag, "  Special charger:    %s", check_bit_(data[282], 32) ? "ON" : "OFF");
+    ESP_LOGI(tag, "  Smart sleep:                               %d h", data[286]);
+    ESP_LOGI(tag, "  Data field enable control 0:               %d", data[287]);
+}
+
+void JkBmsBle::decode_cell_info_(const std::vector<uint8_t> &data)
+{
+    ESP_LOGI(tag, "Cell info frame (%d bytes) received", data.size());
+    // TODO: Decode cell info
 }

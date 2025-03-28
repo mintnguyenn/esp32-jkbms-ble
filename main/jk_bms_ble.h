@@ -6,6 +6,7 @@
 #include "nimble/nimble_port_freertos.h"
 #include "host/ble_hs.h"
 #include "host/util/util.h"
+#include "host/ble_gatt.h"
 #include "console/console.h"
 #include "services/gap/ble_svc_gap.h"
 
@@ -28,6 +29,17 @@ public:
   static bool write_register(uint8_t address, uint32_t value, uint8_t length);
   static void assemble(const uint8_t *data, uint16_t length);
   static void decode_device_info_(const std::vector<uint8_t> &data);
+  static void decode_device_settings_(const std::vector<uint8_t> &data);
+  static void decode_cell_info_(const std::vector<uint8_t> &data);
+
+  static float ieee_float_(uint32_t f) {
+    static_assert(sizeof(float) == sizeof f, "`float` has a weird size.");
+    float ret;
+    memcpy(&ret, &f, sizeof(float));
+    return ret;
+  }
+
+  static bool check_bit_(uint8_t mask, uint8_t flag) { return (mask & flag) == flag; }
 
 private:
   static std::vector<uint8_t> frame_buffer_;
