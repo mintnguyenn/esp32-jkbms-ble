@@ -42,7 +42,6 @@ private:
     bool write_register(uint8_t address, uint32_t value, uint8_t length);
 
     IBmsDataProcessor *m_dataProcessor_;
-    const char *m_tag = "ESP32-BMS";
 };
 
 #endif // BLE_MANAGER_H

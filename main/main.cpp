@@ -1,16 +1,25 @@
 #include <stdio.h>
 
-// #include "jk_bms_ble.h"
 #include "ble_manager.h"
 #include "bms_data_decode.h"
 
-extern "C" void app_main(void)
+void my_task(void *pvParameters)
 {
-    static BmsDataDecode bmsParser;
-    static BleManager bleManager(&bmsParser);
-    bleManager.initialize();
+    BmsDataDecode bmsParser;
+    BleManager bleManager(&bmsParser);
 
-    // delay(1000);
+    bleManager.initialize();
     vTaskDelay(pdMS_TO_TICKS(1000));
     bleManager.startScanning();
+
+    while (true)
+    {
+        // keep the task alive
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
+extern "C" void app_main(void)
+{
+    xTaskCreatePinnedToCore(my_task, "esp32_jk-bms_ble_demostration", 8192, nullptr, 1, nullptr, 1);
 }
