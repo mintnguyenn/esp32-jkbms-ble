@@ -7,10 +7,7 @@ void my_task(void *pvParameters)
 {
     BmsDataDecode bmsParser;
     BleManager bleManager(&bmsParser);
-
     bleManager.initialize();
-    vTaskDelay(pdMS_TO_TICKS(1000));
-    bleManager.startScanning();
 
     while (true)
     {
@@ -21,5 +18,5 @@ void my_task(void *pvParameters)
 
 extern "C" void app_main(void)
 {
-    xTaskCreatePinnedToCore(my_task, "esp32_jk-bms_ble_demostration", 8192, nullptr, 1, nullptr, 1);
+    xTaskCreatePinnedToCore(my_task, "esp32_jk-bms_ble_demonstration", 8192, nullptr, 1, nullptr, 1);
 }

@@ -8,7 +8,7 @@
 //--------------------------------------------------
 
 // Target device MAC address
-static const uint8_t TARGET_DEVICE_ADDR[] = {0xB6, 0x05, 0x1F, 0x80, 0x47, 0xC8};
+static const uint8_t TARGET_DEVICE_ADDR[] = {0xB6, 0x05, 0x1F, 0x80, 0x47, 0xC8}; // Reverse this to match your device's MAC address
 
 // Request command for JK-BMS
 static const uint8_t COMMAND_CELL_INFO = 0x96;
@@ -16,6 +16,9 @@ static const uint8_t COMMAND_DEVICE_INFO = 0x97;
 
 // Logging tag
 static const char *m_tag = "Ble-Mgr";
+
+// Global pointer to the BleManager instance
+static BleManager *gBleManager = nullptr;
 
 /*
  * BLE callback for reset events.
@@ -33,6 +36,12 @@ static void bleOnSync(void)
     int rc = ble_hs_util_ensure_addr(0);
     assert(rc == 0);
     ESP_LOGI(m_tag, "BLE stack synchronized. Scanning can be executed now.");
+
+    // Use the global pointer to call startScanning
+    if (gBleManager != nullptr)
+        gBleManager->startScanning();
+    else
+        ESP_LOGE(m_tag, "BleManager instance is not initialized");
 }
 
 /*
@@ -50,9 +59,15 @@ uint8_t crc(const uint8_t data[], const uint16_t len)
 // BleManager Class Constructors/Destructor
 //--------------------------------------------------
 
-BleManager::BleManager() : m_dataProcessor_(nullptr) {}
+BleManager::BleManager() : m_dataProcessor_(nullptr)
+{
+    gBleManager = this;
+}
 
-BleManager::BleManager(IBmsDataProcessor *processor) : m_dataProcessor_(processor) {}
+BleManager::BleManager(IBmsDataProcessor *processor) : m_dataProcessor_(processor)
+{
+    gBleManager = this;
+}
 
 BleManager::~BleManager() {}
 
@@ -84,6 +99,7 @@ esp_err_t BleManager::initialize()
     ble_hs_cfg.store_status_cb = ble_store_util_status_rr;
     ble_svc_gap_device_name_set("esp32");
     nimble_port_freertos_init(BleManager::bleHostTask);
+
     return ESP_OK;
 }
 
@@ -181,11 +197,14 @@ int BleManager::handleEvent(struct ble_gap_event *event)
             return 0;
         }
         ESP_LOGI(m_tag, "CONNECTION COMPLETED; conn_handle=%d", event->connect.conn_handle);
-        int rc = ble_gattc_exchange_mtu(event->connect.conn_handle, nullptr, nullptr);
-        if (rc != 0)
-        {
-            ESP_LOGW(m_tag, "MTU exchange failed; rc=%d", rc);
-        }
+
+        // Generally we should wait for the MTU exchange signal sent by the BMS.
+        // Uncomment the next lines to initiate MTU exchange immediately, or in case the BMS doesn't send it
+        // int rc = ble_gattc_exchange_mtu(event->connect.conn_handle, nullptr, nullptr);
+        // if (rc != 0)
+        // {
+        //     ESP_LOGW(m_tag, "MTU exchange failed; rc=%d", rc);
+        // }
         break;
     }
 
@@ -221,10 +240,20 @@ int BleManager::handleEvent(struct ble_gap_event *event)
 
         // After MTU update, the JK-BMS now can send a big data frame.
         // We can now send a command to the device to get the device info.
-        write_register(COMMAND_DEVICE_INFO, 0x00000000, 0x00);
-        vTaskDelay(pdMS_TO_TICKS(500));
-        write_register(COMMAND_CELL_INFO, 0x00000000, 0x00);
-        vTaskDelay(pdMS_TO_TICKS(500));
+        // Use a static flag to ensure these commands are only sent once per connection.
+        static bool commands_sent = false;
+        if (!commands_sent)
+        {
+            commands_sent = true; // Mark that we've sent the commands
+            write_register(COMMAND_DEVICE_INFO, 0x00000000, 0x00);
+            vTaskDelay(pdMS_TO_TICKS(500));
+            write_register(COMMAND_CELL_INFO, 0x00000000, 0x00);
+            vTaskDelay(pdMS_TO_TICKS(500));
+        }
+        else
+        {
+            ESP_LOGI(m_tag, "MTU event already processed; skipping duplicate commands.");
+        }
         break;
     }
 

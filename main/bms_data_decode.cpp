@@ -242,6 +242,7 @@ void BmsDataDecode::decodeCellInfo(const std::vector<uint8_t> &data)
     uint8_t min_voltage_cell = 0;
     uint8_t max_voltage_cell = 0;
     uint8_t cells_enabled = 0;
+
     ESP_LOGI(m_tag, "Cell info frame (%d bytes) received", (int)data.size());
 
     for (uint8_t i = 0; i < cells; i++)
@@ -321,7 +322,7 @@ void BmsDataDecode::decodeCellInfo(const std::vector<uint8_t> &data)
 
 void BmsDataDecode::printCellInfo()
 {
-    ESP_LOGI(m_tag, "JkBmsBle Config Dump");
+    ESP_LOGI(m_tag, "JK-BMS Cell Information:");
 
     ESP_LOGI(m_tag, "Balancing: %d", balancing_binary_sensor_);
     ESP_LOGI(m_tag, "Precharging: %d", precharging_binary_sensor_);
