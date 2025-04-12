@@ -1,5 +1,3 @@
-#include <stdio.h>
-
 #include "ble_manager.h"
 #include "bms_data_decode.h"
 

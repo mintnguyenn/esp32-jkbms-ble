@@ -1,11 +1,9 @@
 #ifndef BMS_DATA_PARSER_H
 #define BMS_DATA_PARSER_H
 
-#include "esp_log.h"
-#include <vector>
-#include <cstdint>
 #include <string>
-#include <cstring>
+#include <vector>
+
 #include "ble_manager.h" // To implement IBmsDataProcessor
 
 class BmsDataDecode : public IBmsDataProcessor
