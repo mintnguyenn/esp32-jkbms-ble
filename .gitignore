@@ -1,8 +1,16 @@
+# Build artifacts
 build/
-managed_components/
-.vscode/
-.devcontainer/
+*.bin
 
+# Managed components
+managed_components/
+
+# ESP-IDF config files
 sdkconfig
 sdkconfig.old
 dependencies.lock
+
+# IDE / editor settings
+.vscode/
+.devcontainer/
+.DS_Store
