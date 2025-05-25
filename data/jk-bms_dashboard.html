@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>JK-BMS Monitoring Dashboard</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: sans-serif;
+      background: #f4f4f4;
+    }
+    header {
+      background: #eaeaea;
+      padding: 12px 20px;
+      font-size: 30px;
+      font-weight: bold;
+      border-bottom: 1px solid #ccc;
+      text-align: center;
+    }
+    #main {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      gap: 24px;
+      padding: 20px;
+    }
+    #scanPanel {
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 12px;
+    }
+    #scanPanel h3 {
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+    #scanPanel button {
+      display: block;
+      margin-bottom: 8px;
+      padding: 6px 10px;
+      width: 100%;
+      font-size: 13px;
+    }
+    #deviceList {
+      margin-top: 10px;
+      font-size: 13px;
+      max-height: 160px;
+      overflow-y: auto;
+      border-top: 1px solid #ddd;
+      padding-top: 6px;
+    }
+    .device {
+      padding: 4px 0;
+      border-bottom: 1px solid #eee;
+    }
+    #overview {
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 12px;
+    }
+    #overview h3 {
+      font-size: 16px;
+      margin-bottom: 16px;
+    }
+    .row {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 12px;
+    }
+    .box {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid #ddd;
+      background: #fafafa;
+      text-align: center;
+    }
+    .box .label {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 6px;
+    }
+    .box .value {
+      font-size: 18px;
+      font-weight: bold;
+    }
+    #cells {
+      margin-top: 20px;
+      padding: 12px;
+      border: 1px dashed #aaa;
+      background: #fff;
+      text-align: center;
+      color: #aaa;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <header>JK-BMS Monitoring Dashboard</header>
+
+  <div id="main">
+    <!-- Scan panel -->
+    <div id="scanPanel">
+      <h3>Scan Controls</h3>
+      <button id="startBtn">▶️ Start Scan</button>
+      <button id="stopBtn">⏹ Stop Scan</button>
+      <div id="deviceList">Device List</div>
+    </div>
+
+    <!-- Battery overview -->
+    <div id="overview">
+      <h3>Battery Overview</h3>
+      <div class="row">
+        <div class="box">
+          <div class="label">Voltage</div>
+          <div class="value" id="voltage">-- V</div>
+        </div>
+        <div class="box">
+          <div class="label">Current</div>
+          <div class="value" id="current">-- A</div>
+        </div>
+        <div class="box">
+          <div class="label">SOC</div>
+          <div class="value" id="soc">-- %</div>
+        </div>
+        <div class="box">
+          <div class="label">Temp</div>
+          <div class="value" id="temp">-- °C</div>
+        </div>
+      </div>
+      <div id="cells">[ Cell-level data panel coming soon... ]</div>
+    </div>
+  </div>
+</body>
+</html>
