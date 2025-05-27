@@ -1,15 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <title>JK-BMS Monitoring Dashboard</title>
   <style>
+    /* ─────────── Global Styles ─────────── */
     body {
       margin: 0;
       padding: 0;
       font-family: sans-serif;
       background: #f4f4f4;
     }
+
     header {
       background: #eaeaea;
       padding: 12px 20px;
@@ -18,54 +21,105 @@
       border-bottom: 1px solid #ccc;
       text-align: center;
     }
+
+    /* ─────────────── Layout ────────────── */
     #main {
       display: grid;
-      grid-template-columns: 220px 1fr;
+      grid-template-columns: 240px 1fr;
       gap: 24px;
       padding: 20px;
     }
-    #scanPanel {
+
+    /* ────── Device Connection Panel ────── */
+    #connectPanel {
       background: #fff;
       border: 1px solid #ccc;
       padding: 12px;
     }
-    #scanPanel h3 {
-      margin-bottom: 10px;
-      font-size: 14px;
+
+    #connectPanel h3 {
+      font-size: 16px;
+      margin: 0 0 16px;
+      text-align: center;
     }
-    #scanPanel button {
-      display: block;
-      margin-bottom: 8px;
-      padding: 6px 10px;
+
+    #connectPanel input {
       width: 100%;
+      padding: 6px 10px;
+      margin-bottom: 10px;
       font-size: 13px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
     }
-    #deviceList {
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .btn-row button {
+      flex: 1;
+      padding: 6px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .status-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      font-size: 13px;
+      justify-content: left;
+    }
+
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #ccc;
+    }
+
+    .status-label {
+      color: #888;
+      font-weight: 500;
+    }
+
+    .status-connected .status-dot {
+      background: #4CAF50;
+    }
+
+    .status-connected .status-label {
+      color: #4CAF50;
+    }
+
+    .device-info {
       margin-top: 10px;
       font-size: 13px;
-      max-height: 160px;
-      overflow-y: auto;
-      border-top: 1px solid #ddd;
-      padding-top: 6px;
+      text-align: center;
+      color: #444;
     }
-    .device {
-      padding: 4px 0;
-      border-bottom: 1px solid #eee;
-    }
+
+    /* ─────── Battery Overview Panel ────── */
     #overview {
       background: #fff;
       border: 1px solid #ccc;
       padding: 12px;
     }
+
     #overview h3 {
       font-size: 16px;
-      margin-bottom: 16px;
+      margin: 0 0 16px;
+      text-align: center;
     }
+
     .row {
       display: flex;
       gap: 20px;
       margin-bottom: 12px;
     }
+
     .box {
       flex: 1;
       padding: 8px;
@@ -73,15 +127,18 @@
       background: #fafafa;
       text-align: center;
     }
+
     .box .label {
       font-size: 13px;
       color: #666;
       margin-bottom: 6px;
     }
+
     .box .value {
       font-size: 18px;
       font-weight: bold;
     }
+
     #cells {
       margin-top: 20px;
       padding: 12px;
@@ -93,19 +150,30 @@
     }
   </style>
 </head>
+
 <body>
   <header>JK-BMS Monitoring Dashboard</header>
 
   <div id="main">
-    <!-- Scan panel -->
-    <div id="scanPanel">
-      <h3>Scan Controls</h3>
-      <button id="startBtn">▶️ Start Scan</button>
-      <button id="stopBtn">⏹ Stop Scan</button>
-      <div id="deviceList">Device List</div>
+    <!-- Manual Connect Panel -->
+    <div id="connectPanel">
+      <h3>Device Connection</h3>
+      <input id="macInput" type="text" placeholder="Enter JK-BMS MAC address">
+      <div class="btn-row">
+        <button id="connectBtn">🔗 Pair</button>
+        <button id="disconnectBtn">❌ Unpair</button>
+      </div>
+      <div id="connectStatusContainer" class="status-container">
+        <div class="status-dot" id="statusDot"></div>
+        <span class="status-label" id="statusLabel">Disconnected</span>
+      </div>
+      <div id="deviceInfo" class="device-info" style="display: none;">
+        <div><strong>Device:</strong> <span id="deviceName">—</span></div>
+        <div><strong>MAC:</strong> <span id="deviceMac">—</span></div>
+      </div>
     </div>
 
-    <!-- Battery overview -->
+    <!-- Battery Overview -->
     <div id="overview">
       <h3>Battery Overview</h3>
       <div class="row">
@@ -129,5 +197,68 @@
       <div id="cells">[ Cell-level data panel coming soon... ]</div>
     </div>
   </div>
+
+  <script>
+    // Validate MAC: six hex pairs separated by colons
+    function isValidMac(mac) {
+      return /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/.test(mac);
+    }
+
+    // Update connection status UI
+    function updateConnectionUI(connected, name = '', mac = '') {
+      const container = document.getElementById('connectStatusContainer');
+      const label = document.getElementById('statusLabel');
+      const info = document.getElementById('deviceInfo');
+      if (connected) {
+        container.classList.add('status-connected');
+        label.textContent = 'Connected';
+        document.getElementById('deviceName').textContent = name;
+        document.getElementById('deviceMac').textContent = mac;
+        info.style.display = 'block';
+      } else {
+        container.classList.remove('status-connected');
+        label.textContent = 'Disconnected';
+        info.style.display = 'none';
+      }
+    }
+
+    document.getElementById('connectBtn').addEventListener('click', async () => {
+      const mac = document.getElementById('macInput').value.trim();
+      if (!isValidMac(mac)) {
+        return alert('Please enter a valid MAC (AA:BB:CC:DD:EE:FF)');
+      }
+      try {
+        const res = await fetch('/api/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mac })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          updateConnectionUI(true, data.name, data.mac);
+        } else {
+          updateConnectionUI(false);
+          alert('Connection failed');
+        }
+      } catch (e) {
+        updateConnectionUI(false);
+        alert('Error connecting');
+      }
+    });
+
+    document.getElementById('disconnectBtn').addEventListener('click', async () => {
+      try {
+        const res = await fetch('/api/disconnect', { method: 'POST' });
+        if (res.ok) {
+          updateConnectionUI(false);
+        } else {
+          alert('Disconnection failed');
+        }
+      } catch (e) {
+        alert('Error disconnecting');
+      }
+    });
+  </script>
 </body>
+
 </html>
