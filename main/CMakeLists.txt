@@ -1,4 +1,4 @@
-idf_component_register(SRCS "bms_data_decode.cpp" "ble_manager.cpp" "main.cpp"
+idf_component_register(SRCS "dashboard_server.cpp" "bms_data_decode.cpp" "ble_manager.cpp" "main.cpp"
                     INCLUDE_DIRS ".")
 
 target_include_directories(${COMPONENT_LIB} PRIVATE
