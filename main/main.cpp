@@ -6,53 +6,13 @@
 #include "ble_manager.h"
 #include "bms_data_decode.h"
 #include "dashboard_server.h"
-
-#define WIFI_SSID "Mitaelectric1"
-#define WIFI_PASS "1234567890"
-
-void connect_to_home_wifi()
-{
-    // Initialize NVS — required for WiFi
-    ESP_ERROR_CHECK(nvs_flash_init());
-
-    // Initialize TCP/IP stack and default event loop
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-
-    // Create default WiFi STA interface
-    esp_netif_create_default_wifi_sta();
-
-    // Initialize WiFi with default config
-    wifi_init_config_t init_cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&init_cfg));
-
-    // Configure WiFi credentials
-    wifi_config_t wifi_cfg = {};
-    strncpy((char*)wifi_cfg.sta.ssid,     WIFI_SSID, sizeof(wifi_cfg.sta.ssid));
-    strncpy((char*)wifi_cfg.sta.password, WIFI_PASS, sizeof(wifi_cfg.sta.password));
-
-    // Set to station mode
-    ESP_LOGI("wifi", "Setting WiFi mode to STA");
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-
-    // Apply configuration
-    ESP_LOGI("wifi", "Configuring WiFi SSID:%s", WIFI_SSID);
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_cfg));
-
-    // Start WiFi
-    ESP_LOGI("wifi", "Starting WiFi");
-    ESP_ERROR_CHECK(esp_wifi_start());
-
-    // Connect with stored credentials
-    ESP_LOGI("wifi", "Connecting to WiFi...");
-    ESP_ERROR_CHECK(esp_wifi_connect());
-}
+#include "wifi_manager.h"
 
 bool mount_littlefs()
 {
     esp_vfs_littlefs_conf_t conf = {
-        .base_path = "/littlefs",
-        .partition_label = "littlefs",
+        .base_path = "/web",
+        .partition_label = "web",
         .partition = nullptr,
 #ifdef CONFIG_LITTLEFS_SDMMC_SUPPORT
         .sdcard = nullptr,
@@ -70,7 +30,7 @@ bool mount_littlefs()
         return false;
     }
 
-    FILE *f = fopen("/littlefs/jk-bms_dashboard.html", "r");
+    FILE *f = fopen("/web/jk-bms_dashboard.html", "r");
     if (f)
     {
         ESP_LOGI("fs", "jk-bms_dashboard.html found.");
@@ -91,8 +51,8 @@ void my_task(void *pvParameters)
     // BleManager bleManager(&bmsParser);
     // bleManager.initialize();
 
-    DashboardServer dashboardServer;
-    dashboardServer.start();
+    // DashboardServer dashboardServer;
+    // dashboardServer.start();
 
     while (true)
     {
@@ -111,9 +71,6 @@ extern "C" void app_main(void)
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
-
-    // Connect to home Wi-Fi
-    connect_to_home_wifi();
 
     // Mount LittleFS
     if (!mount_littlefs())

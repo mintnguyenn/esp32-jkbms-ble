@@ -8,4 +8,4 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(esp32_jk_bms_ble)
 
 # Add LittleFS build support
-littlefs_create_partition_image(littlefs data FLASH_IN_PROJECT)
+littlefs_create_partition_image(web data FLASH_IN_PROJECT)
