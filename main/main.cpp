@@ -72,6 +72,10 @@ extern "C" void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
 
+    // Initialize the Wi-Fi stack
+    WifiManager wifiManager;
+    wifiManager.begin();
+
     // Mount LittleFS
     if (!mount_littlefs())
     {
