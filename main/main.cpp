@@ -8,6 +8,13 @@
 #include "dashboard_server.h"
 #include "wifi_manager.h"
 
+// Global DashboardServer instance for use in WifiManager event handlers
+DashboardServer dashboardServer;
+
+/**
+ * @brief Mount the LittleFS partition for web assets.
+ * @return true if successful, false otherwise.
+ */
 bool mount_littlefs()
 {
     esp_vfs_littlefs_conf_t conf = {
@@ -45,14 +52,14 @@ bool mount_littlefs()
     return true;
 }
 
+/**
+ * @brief Main application task.
+ */
 void my_task(void *pvParameters)
 {
     // BmsDataDecode bmsParser;
     // BleManager bleManager(&bmsParser);
     // bleManager.initialize();
-
-    // DashboardServer dashboardServer;
-    // dashboardServer.start();
 
     while (true)
     {
@@ -72,16 +79,17 @@ extern "C" void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
 
-    // Initialize the Wi-Fi stack
-    WifiManager wifiManager;
-    wifiManager.begin();
-
-    // Mount LittleFS
+    // Mount LittleFS for web assets before starting Wi-Fi
     if (!mount_littlefs())
     {
         ESP_LOGE("main", "Filesystem mount failed. Exiting...");
         return;
     }
 
+    // Initialize the Wi-Fi stack and event handlers
+    WifiManager wifiManager;
+    wifiManager.begin();
+
+    // Start main application task
     xTaskCreatePinnedToCore(my_task, "esp32_jk-bms_ble_demonstration", 8192, nullptr, 1, nullptr, 1);
 }

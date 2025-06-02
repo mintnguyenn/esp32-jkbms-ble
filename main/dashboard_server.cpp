@@ -3,7 +3,7 @@
 #include <cstdio>
 
 static const char *TAG = "DashboardServer";
-static const char *INDEX_PATH = "/littlefs/jk-bms_dashboard.html";
+static const char *INDEX_PATH = "/web/jk-bms_dashboard.html";
 
 DashboardServer::DashboardServer() = default;
 
